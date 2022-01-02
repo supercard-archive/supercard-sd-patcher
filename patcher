@@ -1,0 +1,99 @@
+#!/bin/sh
+
+BINDIR=$(dirname "$(readlink -f "$0")")
+compile_if_needed() {
+	test -e "$BINDIR"/"$1" || $CC -O2 "$BINDIR"/"$1".c -o "$BINDIR"/"$1" || \
+	{ echo "compile $1 failed" ; exit 1 ; }
+}
+get_plist() {
+	(
+		cd "$BINDIR"/patches
+		ls -1 "$ROMSPEC"*.txz | sed 's/\.txz$//'
+	)
+}
+die() {
+	echo "$1">&2
+	exit 1
+}
+usage() {
+cat << EOF >&2
+usage: $0 MODE FILEIN FILEOUT [ROMSPEC]
+patches GBA ROM FILEIN for Supercard SD usage, writes result to FILEOUT.
+
+MODE consists of one or more characters from the following set:
+s - "enable saver" - patches the ROM to use a 64KB SAV file for battery saves.
+S - "enable more saver" - same as above, but with a bigger 256KB SAV file.
+p - "enable saver patch" - allows saving battery with L+R+SEL+A. auto-enables
+    's' if none of 's' or 'S' is supplied.
+r - "enable restart" - enables you to return to SC menu with L+R+X+Y+A+B.
+t - "enable real time saver" - creates SCI file and allows you to dump current
+    game state to that file by using L+R+SEL+B. auto-enables 's' and 'r' if not
+    supplied.
+T - "enable more real time saver" - same as above, but with bigger SCI file.
+
+FILEIN: may be either a .gba or .7z file, if the latter, it will be depacked
+automatically.
+
+FILEOUT: needs to end with .gba. it's where the patched rom will be written to.
+if the appropriate MODEs are passed also SCI and SAV files with the same base-
+name will be created. you need to copy all of them to your SD card.
+
+ROMSPEC (optional): unfortunately, some roms use the same code, for example
+those labeled Rev 1 or Rev 2. in such a case we don't automatically decide
+which ROM is the correct one, but allow you to specify it yourself.
+the ROMSPEC string is identical to the filename to the patch pack in the patches
+directory, without .txz extension. if multiple patches for a specific romid
+exist, we'll print a list of ROMSPECs for you to choose from and exit with
+error exit code.
+
+example: $0 SprT ~/nointro_202111/1672-Pokemon.FireRed.USA.Rev.1.7z out/firered_rev1.gba BPRE01_REV1
+EOF
+exit 1
+}
+
+test -z "$CC" && CC=cc
+compile_if_needed trunc
+compile_if_needed gameid
+test -d "$BINDIR"/temp || mkdir -p "$BINDIR"/temp
+rm -f "$BINDIR"/temp/*
+type haxdiff >/dev/null 2>&1 || die "required program haxdiff not found in PATH, get it here: https://codeberg.org/rofl0r/haxdiff"
+
+test $# -lt 3 && usage
+MODE="$1"
+PATCHES=0
+SAV=save.sav
+SCI=
+case "$MODE" in *S*) SAV=more.sav ;; esac
+case "$MODE" in
+	*T*) SCI=more.sci ;;
+	*t*) SCI=isave.sci ;;
+esac
+case "$MODE" in *p*) PATCHES="0 1" ;; esac
+case "$MODE" in *r*|*t*|*T*) PATCHES="$PATCHES 2" ;; esac
+case "$MODE" in *t*|*T*) PATCHES="$PATCHES 3" ;; esac
+
+test $# -gt 3 && ROMSPEC="$4"
+FILEIN="$2"
+FILEOUT="$3"
+case "$FILEIN" in
+*.7z) 7z x -o"$BINDIR"/temp/ "$FILEIN">/dev/null || die "7z failed" ; for x in "$BINDIR"/temp/*.gba ; do FILEIN="$x" ; done ;;
+esac
+test -z "$ROMSPEC" && ROMSPEC=$("$BINDIR"/gameid "$FILEIN")
+test -z "$ROMSPEC" && die "failed to get game code"
+if test $(get_plist | wc -l) -gt 1 ; then die "multiple matching roms, pass one of $(get_plist) as ROMSPEC parameter" ; fi
+if test $(get_plist | wc -l) -lt 1 ; then die "error: could not find patches matching ROM code $ROMSPEC" ; fi
+cp -f "$FILEIN" "$BINDIR"/temp/patched.gba
+FILEIN="$BINDIR"/temp/patched.gba
+"$BINDIR"/trunc -a 16 "$FILEIN" || die "trunc failed"
+( cd "$BINDIR"/temp ; tar xf ../patches/$ROMSPEC.txz  || die "failed to unpack $ROMSPEC.txz" ; )
+for p in $PATCHES ; do
+	haxdiff P "$FILEIN" "$BINDIR"/temp/out.gba < "$BINDIR"/temp/$ROMSPEC/$p.diff || die "failed to apply $p.diff"
+	mv "$BINDIR"/temp/out.gba "$BINDIR"/temp/patched.gba
+	FILEIN="$BINDIR"/temp/patched.gba
+done
+mv "$BINDIR"/temp/patched.gba "$FILEOUT"
+bname=$(printf "%s\n" "$FILEOUT" | sed 's/\.gba$//')
+if test -n "$SAV" ; then cp "$BINDIR"/sav/$SAV "$bname".sav ; fi
+if test -n "$SCI" ; then cp "$BINDIR"/rts/$SCI "$bname".sci ; fi
+rm -rf "$BINDIR"/temp/*
+exit 0
