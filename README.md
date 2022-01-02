@@ -104,3 +104,26 @@ following alternatives come to mind:
   and remove the GUI crap and replace C++ by C code.
 - gbata, a program produced by some folks at gbatemp.net. i haven't come
   across its source code so far.
+
+about supercard sd battery saving mechanism
+-------------------------------------------
+after your rom is patched with battery saver support and doing a regular
+in-game save, your save isn't actually being written to SD card, as you
+would expect. rather it's stored in the flashcart's SRAM. in order to
+tell the supercard firmware to actually store it on the SD card, you need to
+hit L+R+SEL+A and select "save" (and if you use "more saver" option, select
+one of the 4 64KB save slots).
+one major limitation of the supercard firmware is that it treats all saves
+as 64KB, even for games that use 128KB aka 1MBit saves such as the pokemon
+series. in case of pokemon, you're lucky - at least firered version uses
+its 1MBit save memory to store TWO copies, or rather last save and current
+save. therefore it will always detect the second save slot as corrupt, but
+then successfully restores the "old" save. just make sure to always save
+to the first slot when selecting "more saver" option when patching.
+according to pokemon firered decompilation project's src/save.c, each
+save slot takes up 56KB (14*4KB), so you'll never be able to successfully
+use the second save slot, nor hall of fame/battle recording features,
+which follow slot 2.
+since the game stores alternating to slot 1 and 2, it's probably a good idea
+to save TWICE in-game and once using the SCSD firmware before powering off
+the device, so the lower slot is always using latest data.
