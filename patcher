@@ -31,8 +31,8 @@ t - "enable real time saver" - creates SCI file and allows you to dump current
     supplied.
 T - "enable more real time saver" - same as above, but with bigger SCI file.
 
-FILEIN: may be either a .gba or .7z file, if the latter, it will be depacked
-automatically.
+FILEIN: may be either a .gba, .zip or .7z file, if one of the latter,
+it will be depacked automatically.
 
 FILEOUT: needs to end with .gba. it's where the patched rom will be written to.
 if the appropriate MODEs are passed also SCI and SAV files with the same base-
@@ -76,7 +76,7 @@ test $# -gt 3 && ROMSPEC="$4"
 FILEIN="$2"
 FILEOUT="$3"
 case "$FILEIN" in
-*.7z) 7z x -o"$BINDIR"/temp/ "$FILEIN">/dev/null || die "7z failed" ; for x in "$BINDIR"/temp/*.gba ; do FILEIN="$x" ; done ;;
+*.7z|*.zip) 7z x -o"$BINDIR"/temp/ "$FILEIN">/dev/null || die "7z failed" ; for x in "$BINDIR"/temp/*.gba ; do FILEIN="$x" ; done ;;
 esac
 test -z "$ROMSPEC" && ROMSPEC=$("$BINDIR"/gameid "$FILEIN")
 test -z "$ROMSPEC" && die "failed to get game code"
