@@ -24,6 +24,11 @@ input files, because that's the first step the original sw does when patching
 a rom. care was taken to run numerous checks on the patched/truncated roms
 to make sure they match the output of Supercardsd.exe with untruncated input.
 
+upon executing `patcher`, it will extract the game code from the rom, and
+then, depending on steps selected, apply one or more of those patches to a
+copy of the input rom, then save it to output file, optionally accompanied
+by sav and sci (real time save) files.
+
 disadvantages of this approach
 ------------------------------
 the original supercard sd sw has the following additional features, not covered
@@ -42,7 +47,7 @@ how the original supercard sw works
 -----------------------------------
 once you click the "add" button, supercardsd.exe copies the input file to
 a random temporary filename in temp/, truncates the trailing 0xff bytes to the
-last 16-bit aligned boundary, and patches 3 or so 4 byte words.
+last 16-byte aligned boundary, and patches 3 or so 4 byte words.
 this is what i call the "base patch", which is identical to the output
 when you select only "enable save". this base patching is done to every rom,
 regardless of which settings you later select.
